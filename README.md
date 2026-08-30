@@ -1,25 +1,25 @@
 # Ketcher Draw
 
-基于 [Ketcher](https://github.com/epam/ketcher) 定制的化学结构编辑器（Apache-2.0）。
+A customized chemical structure editor based on [Ketcher](https://github.com/epam/ketcher) (Apache-2.0).
 
-**用途**：在任意网页里弹出一个化学结构画板，用户画完/关闭画板后返回 SMILES，无需安装任何 npm 包。
+**Use case**: embed a chemical structure editor in any web page. The user draws, closes the panel, and you get back the SMILES — no npm packages required.
 
-## 快速开始
+## Quick Start
 
-### 1. 获取产物
+### 1. Get the build
 
-构建产物是 2 个文件，位于 `example/dist/embed/`：
+The build output is 2 files in `example/dist/embed/`:
 
 ```
-ketcher-embed.js          # 主包（含 React，CSS 已内联）
-assets/indigoWorker-*.js  # Indigo 化学引擎（WASM Worker）
+ketcher-embed.js          # main bundle (includes React, CSS inlined)
+assets/indigoWorker-*.js  # Indigo chemistry engine (WASM Worker)
 ```
 
-把这两个文件放到前端项目的静态目录（或 CDN），**保持 `assets/` 相对路径不变**。
+Copy these into your front-end static directory (or a CDN), **keeping the `assets/` relative path unchanged**.
 
-> 需要重新构建时：`cd example && npm run build:embed`
+> To rebuild: `cd example && npm run build:embed`
 
-### 2. 页面里使用
+### 2. Use it in a page
 
 ```html
 <button id="draw">Draw</button>
@@ -29,7 +29,7 @@ assets/indigoWorker-*.js  # Indigo 化学引擎（WASM Worker）
 
   document.getElementById('draw').onclick = async () => {
     const smiles = await openKetcherEditor();
-    console.log(smiles); // 关闭画板后返回 SMILES，取消则返回 null
+    console.log(smiles); // SMILES when closed, null when cancelled
   };
 </script>
 ```
@@ -38,38 +38,38 @@ assets/indigoWorker-*.js  # Indigo 化学引擎（WASM Worker）
 
 #### `openKetcherEditor(options?) → Promise<string | null>`
 
-弹出一个模态画板，关闭时 resolve 当前结构 SMILES（点取消返回 `null`）。
+Opens a modal editor. Resolves with the current structure SMILES when closed (returns `null` on cancel).
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `smiles` | `string` | 打开时预载入的结构（SMILES） |
-| `onChange` | `(smiles: string) => void` | 画板内每次结构变化时回调 |
-| `okLabel` / `cancelLabel` | `string` | 按钮文字，默认 `OK` / `Cancel` |
+| Option | Type | Description |
+|--------|------|-------------|
+| `smiles` | `string` | Preload a structure (SMILES) when opening |
+| `onChange` | `(smiles: string) => void` | Called on every structure change inside the editor |
+| `okLabel` / `cancelLabel` | `string` | Button labels, default `OK` / `Cancel` |
 
 ```js
 const smiles = await openKetcherEditor({
-  smiles: 'CCO',                       // 预载入乙醇
-  onChange: (s) => console.log('绘制中:', s),
+  smiles: 'CCO',                    // preload ethanol
+  onChange: (s) => console.log('drawing:', s),
 });
 ```
 
 #### `createKetcherEmbed(container, options?) → Promise<api>`
 
-把画板嵌入到页面指定容器（非弹窗）。
+Embeds the editor into a container element on your page (non-modal).
 
-| 方法 | 说明 |
-|------|------|
-| `api.getSmiles()` | 获取当前结构 SMILES |
-| `api.setSmiles('CCO')` | 从 SMILES 载入结构 |
-| `api.getKetcher()` | 底层 Ketcher 实例 |
-| `api.destroy()` | 卸载编辑器 |
+| Method | Description |
+|--------|-------------|
+| `api.getSmiles()` | Get the current structure as SMILES |
+| `api.setSmiles('CCO')` | Load a structure from SMILES |
+| `api.getKetcher()` | Access the underlying Ketcher instance |
+| `api.destroy()` | Unmount the editor |
 
-### 注意事项
+### Notes
 
-- 浏览器需支持 ES Module（现代浏览器均支持）。
-- 首次打开画板会加载约 15MB 的 Indigo 化学引擎，会有短暂等待。
-- 非法 SMILES 会被忽略，不报错。
+- Requires a browser with ES Module support (all modern browsers).
+- The first time the editor opens, it loads the ~15 MB Indigo engine, so there is a brief wait.
+- Invalid SMILES is ignored without throwing.
 
 ## License
 
-Apache-2.0。基于 [epam/ketcher](https://github.com/epam/ketcher) 修改，保留原版权声明。
+Apache-2.0. Based on [epam/ketcher](https://github.com/epam/ketcher), original copyright retained.
