@@ -1,0 +1,417 @@
+/****************************************************************************
+ * Copyright 2021 EPAM Systems
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ ***************************************************************************/
+
+import {
+  AtomAdd,
+  BondAdd,
+  FragmentAdd,
+  FragmentAddStereoAtom,
+  RGroupFragment,
+  RxnArrowAdd,
+  RxnPlusAdd,
+  SimpleObjectAdd,
+  TextCreate,
+  CalcImplicitH,
+  FragmentSetProperties,
+  BondAttr,
+  AtomAttr,
+  ImageUpsert,
+  MultitailArrowUpsert,
+} from '../operations';
+import { fromRGroupAttrs, fromUpdateIfThen } from './rgroup';
+
+import { Action } from './action';
+import type { ReStruct } from 'application/render';
+import type { MultitailArrow } from 'domain/entities/multitailArrow';
+import type { SGroupAttachmentPoint } from 'domain/entities/sGroupAttachmentPoint';
+import { SGroup } from 'domain/entities/sgroup';
+import type { Struct } from 'domain/entities/struct';
+import { Vec2 } from 'domain/entities/vec2';
+import { fromSgroupAddition } from './sgroup';
+import { fromRGroupAttachmentPointAddition } from './rgroupAttachmentPoint';
+import { MonomerMicromolecule } from 'domain/entities/monomerMicromolecule';
+import type { Image } from 'domain/entities/image';
+import { getOrThrow } from '../../../utilities';
+import { KetcherLogger } from 'utilities';
+
+export type CreatedItems = {
+  atoms: number[];
+  bonds: number[];
+  rxnArrows: number[];
+  rxnPluses: number[];
+  texts: number[];
+  images: number[];
+  simpleObjects: number[];
+  multitailArrows: number[];
+};
+
+type PasteItems = {
+  atoms: number[];
+  bonds: number[];
+};
+
+export function fromPaste(
+  restruct: ReStruct,
+  pstruct: Struct,
+  point: Vec2,
+  angle = 0,
+  isPreview = false,
+  needMoveFromTopLeftPoint = false,
+): [Action, PasteItems, CreatedItems] {
+  const xy0 = needMoveFromTopLeftPoint
+    ? pstruct.getCoordBoundingBox().min
+    : getStructCenter(pstruct);
+  const offset = Vec2.diff(point, xy0);
+
+  const action = new Action();
+
+  const aidMap = new Map<number, number>();
+  const fridMap = new Map<number, number>();
+
+  const pasteItems: PasteItems = {
+    // only atoms and bonds now
+    atoms: [],
+    bonds: [],
+  };
+
+  const items: CreatedItems = {
+    atoms: [],
+    bonds: [],
+    rxnArrows: [],
+    rxnPluses: [],
+    texts: [],
+    images: [],
+    simpleObjects: [],
+    multitailArrows: [],
+  };
+
+  pstruct.atoms.forEach((atom, aid) => {
+    const fragmentId = atom.fragment;
+    const isMacromoleculeAtom = pstruct.isAtomFromMacromolecule(aid);
+
+    if (
+      fragmentId !== undefined &&
+      fragmentId !== null &&
+      !fridMap.has(fragmentId) &&
+      !isMacromoleculeAtom
+    ) {
+      const fragment = pstruct.frags.get(fragmentId);
+
+      if (fragment === undefined || fragment === null) {
+        const errorMessage = `Fragment not found for pasted atom fragment ${fragmentId}`;
+
+        KetcherLogger.error(`paste.ts::fromPaste: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
+
+      const fragmentAdd = action.addOp(
+        new FragmentAdd(null, fragment.properties).perform(restruct),
+      ) as FragmentAdd;
+
+      if (fragmentAdd.frid === null) {
+        const errorMessage =
+          'FragmentAdd did not create a fragment ID during paste';
+
+        KetcherLogger.error(`paste.ts::fromPaste: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
+
+      fridMap.set(fragmentId, fragmentAdd.frid);
+    }
+
+    let mappedFragmentId: number | undefined;
+    if (fragmentId !== undefined) {
+      mappedFragmentId = fridMap.get(fragmentId);
+    }
+
+    const tmpAtom = Object.assign(atom.clone(), {
+      fragment: mappedFragmentId,
+    });
+    const operation = new AtomAdd(
+      tmpAtom,
+      Vec2.diff(atom.pp, xy0).rotate(angle).add(point),
+    ).perform(restruct) as AtomAdd;
+    action.addOp(operation);
+    aidMap.set(aid, operation.data.aid as number);
+
+    pasteItems.atoms.push(operation.data.aid as number);
+    items.atoms.push(operation.data.aid as number);
+
+    action.mergeWith(
+      fromRGroupAttachmentPointAddition(
+        restruct,
+        tmpAtom.attachmentPoints,
+        operation.data.aid as number,
+      ),
+    );
+  });
+
+  pstruct.frags.forEach((frag, frid) => {
+    if (!frag) return;
+    if (frag.properties) {
+      const newFragmentId = fridMap.get(frid);
+
+      if (newFragmentId === undefined) {
+        throw new Error(
+          `Fragment ${frid} is missing from fridMap during paste`,
+        );
+      }
+
+      action.addOp(
+        new FragmentSetProperties(newFragmentId, frag.properties).perform(
+          restruct,
+        ),
+      );
+    }
+    frag.stereoAtoms.forEach((aid) => {
+      const newFragmentId = fridMap.get(frid);
+      const newStereoAtomId = aidMap.get(aid);
+
+      if (newFragmentId === undefined) {
+        throw new Error(
+          `Fragment ${frid} is missing for stereo atom paste operation`,
+        );
+      }
+
+      if (newStereoAtomId === undefined) {
+        throw new Error(`Atom ${aid} is missing from aidMap during paste`);
+      }
+
+      action.addOp(
+        new FragmentAddStereoAtom(newFragmentId, newStereoAtomId).perform(
+          restruct,
+        ),
+      );
+    });
+  });
+
+  pstruct.bonds.forEach((bond) => {
+    const operation = new BondAdd(
+      aidMap.get(bond.begin),
+      aidMap.get(bond.end),
+      bond,
+      false,
+    ).perform(restruct) as BondAdd;
+    action.addOp(operation);
+
+    pasteItems.bonds.push(operation.data.bid as number);
+    items.bonds.push(operation.data.bid as number);
+    new BondAttr(
+      operation.data.bid as number,
+      'isPreview',
+      isPreview,
+      false,
+    ).perform(restruct);
+  });
+
+  pstruct.sgroups.forEach((sg: SGroup) => {
+    const newsgid = restruct.molecule.sgroups.newId();
+    const sgAtoms = sg.atoms.map((aid) => aidMap.get(aid));
+    const attachmentPoints: ReadonlyArray<SGroupAttachmentPoint> = (() => {
+      try {
+        return sg.cloneAttachmentPoints(aidMap);
+      } catch (_e) {
+        // For macromolecules, attachment points may reference atoms not in aidMap
+        // This is expected behavior, use empty array instead
+        return [];
+      }
+    })();
+    if (
+      sg.isNotContractible(pstruct) &&
+      !(sg instanceof MonomerMicromolecule) &&
+      !SGroup.isSuperAtom(sg)
+    ) {
+      sg.setAttr('expanded', true);
+    }
+    const sgAction = fromSgroupAddition(
+      restruct,
+      sg.type,
+      sgAtoms,
+      sg.data,
+      newsgid,
+      attachmentPoints,
+      sg.pp ? sg.pp.add(offset) : null,
+      sg.type === 'SUP' ? sg.isExpanded() : null,
+      sg.data.name,
+      sg,
+    );
+    sgAction.operations.reverse();
+    sgAction.operations.forEach((oper) => {
+      action.addOp(oper);
+    });
+  });
+
+  pasteItems.atoms.forEach((aid) => {
+    action.addOp(new CalcImplicitH([aid]).perform(restruct));
+    new AtomAttr(aid, 'isPreview', isPreview).perform(restruct);
+  });
+
+  pstruct.rxnArrows.forEach((rxnArrow) => {
+    const operation = new RxnArrowAdd(
+      rxnArrow.pos.map((p) => p.add(offset)),
+      rxnArrow.mode,
+      undefined,
+      rxnArrow.height,
+    ).perform(restruct);
+    action.addOp(operation);
+    items.rxnArrows.push(operation.data.id);
+  });
+
+  pstruct.rxnPluses.forEach((plus) => {
+    const operation = new RxnPlusAdd(plus.pp.add(offset)).perform(restruct);
+    action.addOp(operation);
+    if (operation.data.plid !== null) {
+      items.rxnPluses.push(operation.data.plid);
+    }
+  });
+
+  pstruct.simpleObjects.forEach((simpleObject) => {
+    const operation = new SimpleObjectAdd(
+      simpleObject.pos.map((p) => p.add(offset)),
+      simpleObject.mode,
+    ).perform(restruct);
+    action.addOp(operation);
+    items.simpleObjects.push(operation.data.id);
+  });
+
+  pstruct.texts.forEach((text) => {
+    const operation = new TextCreate(
+      text.content,
+      text.position.add(offset),
+      text.pos.map((p) => p.add(offset)),
+    ).perform(restruct);
+    action.addOp(operation);
+    items.texts.push(operation.data.id);
+  });
+
+  pstruct.images.forEach((image: Image) => {
+    const clonedImage = image.clone();
+    clonedImage.addPositionOffset(offset);
+    const operation = new ImageUpsert(clonedImage).perform(restruct);
+    action.addOp(operation);
+    items.images.push(operation.data.id);
+  });
+
+  pstruct.multitailArrows.forEach((multitailArrow: MultitailArrow) => {
+    const clonedMultitailArrow = multitailArrow.clone();
+    clonedMultitailArrow.move(offset);
+    const operation = new MultitailArrowUpsert(clonedMultitailArrow).perform(
+      restruct,
+    );
+    action.addOp(operation);
+    items.multitailArrows.push(operation.data.id);
+  });
+
+  pstruct.rgroups.forEach((rg, rgid) => {
+    rg.frags.forEach((__frag, frid) => {
+      const newFragmentId = fridMap.get(frid);
+
+      if (newFragmentId === undefined) {
+        throw new Error(
+          `Fragment ${frid} is missing for R-group paste mapping`,
+        );
+      }
+
+      action.addOp(new RGroupFragment(rgid, newFragmentId).perform(restruct));
+    });
+    const ifThen = rg.ifthen;
+    const safeIfThenId = pstruct.rgroups.get(ifThen) ? ifThen : 0;
+    action
+      .mergeWith(fromRGroupAttrs(restruct, rgid, rg.getAttrs()))
+      .mergeWith(fromUpdateIfThen(restruct, safeIfThenId, rg.ifthen));
+  });
+
+  action.operations.reverse();
+  return [action, pasteItems, items];
+}
+
+function getStructCenter(struct: Struct): Vec2 {
+  const isOnlyOneSGroup = struct.sgroups.size === 1;
+  if (isOnlyOneSGroup) {
+    const sgroupIterator = struct.sgroups.keys().next();
+    if (!sgroupIterator.done) {
+      const onlyOneStructsSgroupId = sgroupIterator.value;
+      const sgroup = struct.sgroups.get(onlyOneStructsSgroupId);
+      if (sgroup?.isContracted()) {
+        return sgroup.getContractedPosition(struct).position;
+      }
+    }
+  }
+  if (struct.atoms.size > 0) {
+    let xmin = 1e50;
+    let ymin = xmin;
+    let xmax = -xmin;
+    let ymax = -ymin;
+
+    struct.atoms.forEach((atom) => {
+      xmin = Math.min(xmin, atom.pp.x);
+      ymin = Math.min(ymin, atom.pp.y);
+      xmax = Math.max(xmax, atom.pp.x);
+      ymax = Math.max(ymax, atom.pp.y);
+    });
+    return new Vec2((xmin + xmax) / 2, (ymin + ymax) / 2);
+  }
+  if (struct.rxnArrows.size > 0) {
+    const rxnArrow = getOrThrow(
+      struct.rxnArrows,
+      0,
+      'getStructCenter: rxnArrows pool is missing id 0',
+    );
+    return rxnArrow.center();
+  }
+  if (struct.rxnPluses.size > 0) {
+    const rxnPlus = getOrThrow(
+      struct.rxnPluses,
+      0,
+      'getStructCenter: rxnPluses pool is missing id 0',
+    );
+    return rxnPlus.pp;
+  }
+  if (struct.simpleObjects.size > 0) {
+    const simpleObject = getOrThrow(
+      struct.simpleObjects,
+      0,
+      'getStructCenter: simpleObjects pool is missing id 0',
+    );
+    return simpleObject.center();
+  }
+  if (struct.texts.size > 0) {
+    const text = getOrThrow(
+      struct.texts,
+      0,
+      'getStructCenter: texts pool is missing id 0',
+    );
+    return text.position;
+  }
+  if (struct.images.size > 0) {
+    const image = getOrThrow(
+      struct.images,
+      0,
+      'getStructCenter: images pool is missing id 0',
+    );
+    return image.center();
+  }
+  if (struct.multitailArrows.size > 0) {
+    const multitailArrow = getOrThrow(
+      struct.multitailArrows,
+      0,
+      'getStructCenter: multitailArrows pool is missing id 0',
+    );
+    return multitailArrow.center();
+  }
+
+  return new Vec2(0, 0);
+}

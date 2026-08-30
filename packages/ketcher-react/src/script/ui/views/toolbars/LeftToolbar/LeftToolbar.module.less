@@ -1,0 +1,127 @@
+/****************************************************************************
+ * Copyright 2021 EPAM Systems
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ ***************************************************************************/
+
+@import '../toolbar';
+
+.root {
+  .toolbar();
+  .vertical-toolbar();
+
+  width: 78px;
+  margin-top: 12px;
+  margin-left: 6px;
+  padding-right: 5px;
+  align-items: center;
+
+  // TODO: change group style, if will decide to get rid of delimiter everywhere
+  .group:not(:last-of-type) {
+    border-bottom: none;
+  }
+}
+
+.buttons {
+  overflow: hidden;
+  padding-right: 5px;
+  scroll-behavior: smooth;
+}
+
+.fitScale {
+  width: 100%;
+  transform-origin: top center;
+}
+
+.borderOff {
+  border-bottom: none !important;
+}
+
+.groupItem {
+  padding: 2px;
+  background-color: @color-background-primary;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px @color-select-box-shadow;
+
+  // TODO: move to action button styles, when all buttons will have same style
+  svg {
+    right: 3px;
+    bottom: 3px;
+  }
+
+  button {
+    margin: 1px;
+    width: 32px;
+    height: 32px;
+
+    & > svg {
+      top: 3px;
+      left: 3px;
+    }
+  }
+}
+
+.toolsGroup {
+  display: grid;
+  grid-template-columns: repeat(2, 36px);
+  gap: 2px;
+  justify-content: center;
+}
+
+.templatesGroup {
+  display: grid;
+  grid-template-columns: repeat(2, 36px);
+  gap: 2px;
+  justify-content: center;
+}
+
+.atomsList {
+  display: grid;
+  grid-template-columns: repeat(2, 36px);
+  gap: 2px;
+  justify-content: center;
+
+  > div {
+    display: contents;
+  }
+
+  button {
+    width: 36px;
+    height: 30px;
+    padding: 0;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 4px;
+    text-align: center;
+  }
+}
+
+.libraryButton {
+  width: 100%;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background-color: @color-background-primary;
+  color: @color-text-primary;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  padding-left: 6px;
+  cursor: pointer;
+  box-shadow: 0 2px 5px @color-select-box-shadow;
+
+  &:hover {
+    background-color: @color-background-canvas;
+  }
+}
