@@ -130,6 +130,7 @@ const processEnvDefines = Object.fromEntries(
 );
 
 export default defineConfig({
+  base: './',
   define: {
     ...processEnvDefines,
   },

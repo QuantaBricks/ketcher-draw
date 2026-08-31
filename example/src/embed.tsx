@@ -9,6 +9,8 @@ import 'ketcher-react/dist/index.css';
 export interface KetcherEmbedApi {
   /** Get the current structure as SMILES */
   getSmiles: (extended?: boolean) => Promise<string>;
+  /** Get the current structure as MOL */
+  getMolfile: () => Promise<string>;
   /** Load a structure from SMILES */
   setSmiles: (smiles: string) => Promise<void>;
   /** Access the underlying Ketcher instance */
@@ -57,6 +59,7 @@ function mountEditor(
         onInit: (ketcher: Ketcher) => {
           const api: KetcherEmbedApi = {
             getSmiles: (extended = false) => ketcher.getSmiles(extended),
+            getMolfile: () => ketcher.getMolfile(),
             setSmiles: (s: string) => ketcher.setMolecule(s),
             getKetcher: () => ketcher,
             destroy: () => root.unmount(),

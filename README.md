@@ -8,24 +8,64 @@ A customized chemical structure editor based on [Ketcher](https://github.com/epa
 
 ### 1. Get the build
 
-The build output is 2 files in `example/dist/embed/`:
+Build with:
+
+```bash
+cd example && npm run build:embed
+```
+
+Output is in `example/dist/embed/` — copy the whole directory to your static path (e.g. `/ketcher/`):
 
 ```
 ketcher-embed.js          # main bundle (includes React, CSS inlined)
+chunk-*.mjs               # shared ESM chunks
+ucs2length-*.mjs
+raphael.min-*.mjs
 assets/indigoWorker-*.js  # Indigo chemistry engine (WASM Worker)
 ```
 
-Copy these into your front-end static directory (or a CDN), **keeping the `assets/` relative path unchanged**.
+> The Indigo worker is referenced **relative to the bundle** (`new URL("assets/…", import.meta.url)`), so it works under any base path (e.g. `/ketcher/`). No path editing needed — just keep `assets/` next to `ketcher-embed.js`.
 
-> To rebuild: `cd example && npm run build:embed`
+### 2. Deploy under a subpath
 
-### 2. Use it in a page
+If your app is served under `/ketcher/`, put the files at:
+
+```
+public/ketcher/ketcher-embed.js
+public/ketcher/chunk-*.mjs
+public/ketcher/ucs2length-*.mjs
+public/ketcher/raphael.min-*.mjs
+public/ketcher/assets/indigoWorker-*.js
+```
+
+### 3. Use it in a page
+
+Load via a small loader module (do not `import` the file directly from `public`):
+
+```js
+// loader.js
+let readyPromise;
+function load() {
+  if (!readyPromise) {
+    readyPromise = import(/* @vite-ignore */ '/ketcher/ketcher-embed.js').then((m) => {
+      // API is ready
+      document.dispatchEvent(new CustomEvent('ketcher-ready', { detail: m }));
+      return m;
+    });
+  }
+  return readyPromise;
+}
+
+export async function getKetcherApi() {
+  const m = await load();
+  return m; // { openKetcherEditor, createKetcherEmbed }
+}
+```
 
 ```html
-<button id="draw">Draw</button>
-
 <script type="module">
-  import { openKetcherEditor } from './ketcher-embed.js';
+  import { openKetcherEditor } from '/ketcher/ketcher-embed.js';
+  // or: document.addEventListener('ketcher-ready', () => { ... });
 
   document.getElementById('draw').onclick = async () => {
     const smiles = await openKetcherEditor();
@@ -34,7 +74,7 @@ Copy these into your front-end static directory (or a CDN), **keeping the `asset
 </script>
 ```
 
-### 3. API
+### 4. API
 
 #### `openKetcherEditor(options?) → Promise<string | null>`
 
@@ -61,14 +101,16 @@ Embeds the editor into a container element on your page (non-modal).
 |--------|-------------|
 | `api.getSmiles()` | Get the current structure as SMILES |
 | `api.setSmiles('CCO')` | Load a structure from SMILES |
+| `api.getMolfile()` | Get the current structure as MOL (via `getKetcher().getMolfile()`) |
 | `api.getKetcher()` | Access the underlying Ketcher instance |
-| `api.destroy()` | Unmount the editor |
+| `api.destroy()` | Unmount the editor (call when the modal/panel is closed) |
 
 ### Notes
 
 - Requires a browser with ES Module support (all modern browsers).
 - The first time the editor opens, it loads the ~15 MB Indigo engine, so there is a brief wait.
 - Invalid SMILES is ignored without throwing.
+- Only `openKetcherEditor` / `createKetcherEmbed` are the public API; do not depend on internal exports.
 
 ## License
 
