@@ -141,6 +141,7 @@ export default defineConfig({
       },
     },
   },
+  publicDir: false,
   plugins: [
     PackageScopedAliasesPlugin(),
     react(),
