@@ -31,6 +31,8 @@ cd ketcher-embed
 npx serve .          # or: python -m http.server
 ```
 
+Then open the URL it prints, e.g. **http://localhost:3000/embed-usage.html**.
+
 > Opening it via `file://` will **not** work: browsers block ES modules and web workers on the `file:` protocol. Any static HTTP server is fine.
 
 ### 3. Use it in your page
@@ -48,7 +50,7 @@ Copy the folder into your static assets (e.g. `public/ketcher-embed/`) and impor
 </script>
 ```
 
-Everything (chunks, Indigo worker) is resolved **relative to `ketcher-embed.js`** (`new URL("…", import.meta.url)`), so the folder works under any base path (e.g. `/ketcher-embed/`, `/static/kdraw/`). No path editing needed — just keep the folder contents together.
+Everything (chunks, Indigo worker) is resolved **relative to `ketcher-embed.js`** (`new URL("…", import.meta.url)`), so the folder works under any base path (e.g. `/ketcher-embed/`, `/static/kdraw/`). No path editing needed — just keep the folder contents together. The import path in your page must match where the folder is served: in the example above the folder sits at `<server-root>/ketcher-embed/`. (In the step-2 demo the server root *is* the folder itself, which is why `embed-usage.html` imports `./ketcher-embed.js`.)
 
 If your bundler (Vite/webpack) would try to process the import at build time, load it at runtime instead so the file is served as-is:
 
@@ -154,6 +156,7 @@ The same loader pattern works in Vue/Svelte/Angular: keep the folder as a static
 - Requires a browser with ES Module support (all modern browsers).
 - The first time the editor opens, it loads the ~15 MB Indigo engine, so there is a brief wait.
 - Invalid SMILES is ignored without throwing.
+- Closing with **OK** or **✕** resolves with the current SMILES (empty string if the canvas is empty); only the **Cancel** button resolves with `null`.
 - Only `openKetcherEditor` / `createKetcherEmbed` are the public API; do not depend on internal exports.
 
 ## Build from source
