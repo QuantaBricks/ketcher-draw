@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev:standalone": "cross-env MODE=standalone vite",
-    "build:embed": "vite build --config vite.embed.config.js",
+    "build:embed": "node ../packages/ketcher-core/scripts/compile-ket-schema.cjs && vite build --config vite.embed.config.js",
     "dev:remote": "cross-env MODE=remote vite",
     "start:standalone": "cross-env MODE=standalone react-app-rewired start",
     "start:remote": "cross-env MODE=remote react-app-rewired start",
