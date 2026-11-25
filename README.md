@@ -18,6 +18,7 @@ ketcher-embed/
 ├── raphael.min-*.mjs
 ├── assets/indigoWorker-*.js  # Indigo chemistry engine (WASM inlined)
 ├── embed-usage.html          # minimal working demo
+├── ketcher-embed.d.ts        # TypeScript declarations
 └── LICENSE / NOTICE
 ```
 
@@ -92,15 +93,61 @@ const smiles = await openKetcherEditor({
 
 #### `createKetcherEmbed(container, options?) → Promise<api>`
 
-Embeds the editor into a container element on your page (non-modal).
+Embeds the editor into a container element on your page (non-modal). All getters/setters are asynchronous:
 
 | Method | Description |
 |--------|-------------|
-| `api.getSmiles()` | Get the current structure as SMILES |
-| `api.setSmiles('CCO')` | Load a structure from SMILES |
-| `api.getMolfile()` | Get the current structure as MOL (via `getKetcher().getMolfile()`) |
+| `await api.getSmiles()` | Get the current structure as SMILES |
+| `await api.setSmiles('CCO')` | Load a structure from SMILES |
+| `await api.getMolfile()` | Get the current structure as MOL |
 | `api.getKetcher()` | Access the underlying Ketcher instance |
 | `api.destroy()` | Unmount the editor (call when the modal/panel is closed) |
+
+### 5. TypeScript & framework integration (React example)
+
+The zip ships **`ketcher-embed.d.ts`**. Copy it into your source tree, then load the bundle at runtime so your bundler leaves it out of your bundle:
+
+```ts
+// ketcher-loader.ts
+import type * as KetcherEmbed from './ketcher-embed';
+import type { KetcherEmbedApi } from './ketcher-embed';
+
+const url = '/ketcher-embed/ketcher-embed.js'; // wherever you copied the folder
+let ready: Promise<typeof KetcherEmbed> | undefined;
+
+export function loadKetcherEmbed() {
+  ready ??= import(/* @vite-ignore */ url).then((m) => m as typeof KetcherEmbed);
+  return ready;
+}
+export type { KetcherEmbedApi };
+```
+
+```tsx
+// Modal editor from a button
+const onClick = async () => {
+  const mod = await loadKetcherEmbed();
+  const smiles = await mod.openKetcherEditor({ smiles: 'CCO' });
+  if (smiles !== null) save(smiles);
+};
+
+// Inline editor inside a component (mount/destroy with the lifecycle)
+useEffect(() => {
+  let api: KetcherEmbedApi | null = null;
+  let cancelled = false;
+  loadKetcherEmbed().then((m) => {
+    if (cancelled || !hostRef.current) return;
+    m.createKetcherEmbed(hostRef.current, { onChange: setSmiles }).then((a) => {
+      api = a;
+    });
+  });
+  return () => {
+    cancelled = true;
+    api?.destroy();
+  };
+}, []);
+```
+
+The same loader pattern works in Vue/Svelte/Angular: keep the folder as a static asset, and tie `createKetcherEmbed`/`destroy` to your framework's mount/unmount hooks. Verified with Vite 7 + React 19 + TypeScript (strict): the app bundle stays ~220 kB because `ketcher-embed.js` is never processed by the bundler.
 
 ### Notes
 

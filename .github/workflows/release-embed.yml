@@ -59,6 +59,7 @@ jobs:
           # drop dangling sourceMappingURL comments (maps are not shipped)
           find "$STAGE" -type f \( -name '*.js' -o -name '*.mjs' \) -exec sed -i '$ s~//# sourceMappingURL=.*~~' {} +
           cp example/embed-usage.html "$STAGE/"
+          cp example/ketcher-embed.d.ts "$STAGE/"
           cp LICENSE NOTICE "$STAGE/"
           zip -r ketcher-embed.zip "$STAGE"
           unzip -l ketcher-embed.zip
