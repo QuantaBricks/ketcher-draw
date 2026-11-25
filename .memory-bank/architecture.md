@@ -23,6 +23,12 @@ packages/
 └── ketcher-standalone/   # Standalone bundle: Indigo WASM + ketcher-core glue
 ```
 
+## Distribution (embed build)
+
+This repository ships a customized, embeddable structure editor. The `example` workspace holds the embed entry (`example/src/embed.tsx`), built by `npm run build:embed` (Vite lib mode: one ES bundle with CSS inlined; the Indigo worker emitted as a separate asset referenced relative to the bundle). The embed build aliases package **sources** directly rather than built `dist`s, so it must generate the KET schema validator first (invariant A7).
+
+Distribution is zero-install: pushing a `v*` tag runs `.github/workflows/release-embed.yml`, which builds the bundle, zips the runtime files (no source maps, plus a usage demo page and licenses), and publishes `ketcher-embed.zip` on the GitHub Release. Consumers copy the unzipped folder to any static path and import the single entry point.
+
 ## Subsystems
 
 ### 1. `ketcher-core`

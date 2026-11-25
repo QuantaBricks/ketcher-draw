@@ -42,6 +42,9 @@ The `packages/ketcher-core/src/domain/` directory must not import from `applicat
 **A6 — Single Ketcher instance per ketcherId**
 The `ketcherProvider` registry enforces at most one `Ketcher` instance per `ketcherId`. Code must use `ketcherProvider.getKetcher(id)` to retrieve instances — never store raw `Ketcher` references in module-level variables without going through the provider.
 
+**A7 — Source-consuming builds must generate the KET schema validator first**
+`packages/ketcher-core/src/domain/serializers/ket/compiledSchema.js` is a *generated*, gitignored artifact produced by `packages/ketcher-core/scripts/compile-ket-schema.cjs` (`npm run ajv -w ketcher-core`, also wired into ketcher-core's `prebuild`/`prestart`). Any build path that imports `ketcher-core` directly from source instead of its built `dist` (e.g. the embed build, `npm run build:embed`) must run this generation step before bundling, or a fresh checkout fails with an unresolved `./compiledSchema` import. `build:embed` is self-contained by invoking the generator script directly.
+
 ---
 
 ## Behavioral Invariants
