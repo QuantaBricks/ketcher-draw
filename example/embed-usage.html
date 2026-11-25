@@ -1,0 +1,55 @@
+<!doctype html>
+<!--
+  Minimal working demo for the Ketcher embed bundle.
+
+  Serve this folder over HTTP(S) and open this page, e.g.:
+    npx serve .          (or: python -m http.server)
+  Opening it via file:// will NOT work: ES modules and web workers
+  are blocked by browsers for the file: protocol.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ketcher Embed &ndash; usage example</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 2rem auto;
+        max-width: 40rem;
+        padding: 0 1rem;
+      }
+      button {
+        font-size: 1rem;
+        padding: 0.5rem 1.25rem;
+        cursor: pointer;
+      }
+      #out {
+        margin-top: 1rem;
+        font-family: ui-monospace, monospace;
+        word-break: break-all;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Ketcher Embed demo</h1>
+    <p>
+      Click the button (ethanol is preloaded), draw a structure, then press
+      <b>OK</b>. The resulting SMILES is printed below.
+    </p>
+    <button id="draw" type="button">Draw structure&hellip;</button>
+    <div id="out"></div>
+
+    <script type="module">
+      import { openKetcherEditor } from './ketcher-embed.js';
+
+      const out = document.getElementById('out');
+      document.getElementById('draw').addEventListener('click', async () => {
+        out.textContent = 'Editor open\u2026 (first launch loads the ~15 MB Indigo engine)';
+        const smiles = await openKetcherEditor({ smiles: 'CCO' });
+        out.textContent =
+          smiles === null ? 'Cancelled.' : `SMILES: ${smiles}`;
+      });
+    </script>
+  </body>
+</html>

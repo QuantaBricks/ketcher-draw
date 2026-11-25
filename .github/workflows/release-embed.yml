@@ -1,0 +1,71 @@
+# Builds the embeddable bundle and publishes it as a GitHub Release asset
+# (ketcher-embed.zip) whenever a version tag is pushed.
+#
+# Usage:
+#   git tag v1.2.3 && git push origin v1.2.3
+#
+# The release asset can then be downloaded at a stable URL:
+#   https://github.com/QuantaBricks/ketcher-draw/releases/latest/download/ketcher-embed.zip
+
+name: Release embed bundle
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js from .nvmrc
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Get npm cache directory path
+        id: npm-cache-dir-path
+        run: echo "dir=$(npm config get cache)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.npm-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build embed bundle
+        run: npm run build:embed
+        working-directory: example
+
+      - name: Package ketcher-embed.zip
+        run: |
+          set -e
+          STAGE=ketcher-embed
+          mkdir -p "$STAGE/assets"
+          # runtime files only (no source maps)
+          find example/dist/embed -maxdepth 1 -type f ! -name '*.map' -exec cp {} "$STAGE/" \;
+          find example/dist/embed/assets -maxdepth 1 -type f ! -name '*.map' -exec cp {} "$STAGE/assets/" \;
+          # drop dangling sourceMappingURL comments (maps are not shipped)
+          find "$STAGE" -type f \( -name '*.js' -o -name '*.mjs' \) -exec sed -i '$ s~//# sourceMappingURL=.*~~' {} +
+          cp example/embed-usage.html "$STAGE/"
+          cp LICENSE NOTICE "$STAGE/"
+          zip -r ketcher-embed.zip "$STAGE"
+          unzip -l ketcher-embed.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: ketcher-embed.zip
+          generate_release_notes: true
